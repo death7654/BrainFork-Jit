@@ -1,0 +1,10 @@
+[package]
+name = "return_42"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies.windows-sys]
+version = "0.61.2" # or latest
+features = [
+    "Win32_System_Memory",
+]
