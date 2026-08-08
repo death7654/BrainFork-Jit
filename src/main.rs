@@ -68,22 +68,97 @@ impl BrainFork {
     pub fn compile(&mut self, source: &str) {
         let mut compiled: Vec<u8> = Vec::new();
         let mut jump: Vec<usize> = Vec::new();
-        for c in source.chars() {
+
+        let mut current_index = 0;
+        let size = source.len();
+        let source_bytes = source.as_bytes();
+
+        let _count = 0;
+        while current_index < size {
+            let c = source_bytes[current_index];
             match c {
                 // inc byte ptr [rcx], Increment cell value at tape pointer
-                '+' => compiled.extend_from_slice(&[0xFE, 0x01]),
+                b'+' => {
+                    let mut count = 0usize;
+                    while current_index < source_bytes.len()
+                        && source_bytes[current_index] == b'+'
+                        && count < 255
+                    {
+                        count += 1;
+                        current_index += 1;
+                    }
 
-                // dec byte ptr [rcx], Decrement cell value at tape pointer
-                '-' => compiled.extend_from_slice(&[0xFE, 0x09]),
+                    if count == 1 {
+                        // Single '+': 2-byte inc byte ptr [rcx]
+                        compiled.extend_from_slice(&[0xFE, 0x01]);
+                    } else {
+                        // Folded '+': 3-byte add byte ptr [rcx], count
+                        compiled.extend_from_slice(&[0x80, 0x01, count as u8]);
+                    }
+                    continue;
+                }
 
-                // inc rcx, Move tape pointer right
-                '>' => compiled.extend_from_slice(&[0x48, 0xFF, 0xC1]),
+                b'-' => {
+                    let mut count = 0usize;
+                    while current_index < source_bytes.len()
+                        && source_bytes[current_index] == b'-'
+                        && count < 255
+                    {
+                        count += 1;
+                        current_index += 1;
+                    }
 
-                // dec rcx, Move tape pointer left
-                '<' => compiled.extend_from_slice(&[0x48, 0xFF, 0xC9]),
+                    if count == 1 {
+                        // Single '-': 2-byte dec byte ptr [rcx]
+                        compiled.extend_from_slice(&[0xFE, 0x09]);
+                    } else {
+                        // Folded '-': 3-byte sub byte ptr [rcx], count
+                        compiled.extend_from_slice(&[0x80, 0x29, count as u8]);
+                    }
+                    continue;
+                }
 
+                b'>' => {
+                    let mut count = 0usize;
+                    while current_index < source_bytes.len()
+                        && source_bytes[current_index] == b'>'
+                        && count < 127
+                    {
+                        count += 1;
+                        current_index += 1;
+                    }
+
+                    if count == 1 {
+                        // Single '>': 3-byte inc rcx
+                        compiled.extend_from_slice(&[0x48, 0xFF, 0xC1]);
+                    } else {
+                        // Folded '>': 4-byte add rcx, count
+                        compiled.extend_from_slice(&[0x48, 0x83, 0xC1, count as u8]);
+                    }
+                    continue;
+                }
+
+                b'<' => {
+                    let mut count = 0usize;
+                    while current_index < source_bytes.len()
+                        && source_bytes[current_index] == b'<'
+                        && count < 127
+                    {
+                        count += 1;
+                        current_index += 1;
+                    }
+
+                    if count == 1 {
+                        // Single '<': 3-byte dec rcx
+                        compiled.extend_from_slice(&[0x48, 0xFF, 0xC9]);
+                    } else {
+                        // Folded '<': 4-byte sub rcx, count
+                        compiled.extend_from_slice(&[0x48, 0x83, 0xE9, count as u8]);
+                    }
+                    continue;
+                }
                 // loop
-                '[' => {
+                b'[' => {
                     // cmp byte ptr [rcx], 0
                     compiled.extend_from_slice(&[0x80, 0x39, 0x00]);
 
@@ -95,7 +170,7 @@ impl BrainFork {
                 }
 
                 // loop end
-                ']' => {
+                b']' => {
                     let placeholder_idx = jump
                         .pop()
                         .expect("Reached end of loop ']' but no loop was started!");
@@ -113,7 +188,7 @@ impl BrainFork {
                     let forward_offset = (compiled.len() - (placeholder_idx + 1)) as u8;
                     compiled[placeholder_idx] = forward_offset;
                 }
-                '.' => {
+                b'.' => {
                     // push rcx
                     compiled.push(0x51);
 
@@ -139,7 +214,7 @@ impl BrainFork {
                     // pop rcx
                     compiled.push(0x59);
                 }
-                ',' => {
+                b',' => {
                     // push rcx
                     compiled.push(0x51);
 
@@ -166,6 +241,7 @@ impl BrainFork {
                 // Ignore non-Brainfork characters
                 _ => {}
             }
+            current_index += 1;
         }
 
         if !jump.is_empty() {
