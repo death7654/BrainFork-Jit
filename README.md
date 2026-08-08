@@ -28,21 +28,18 @@ By passing the pointer to the tape buffer as the first argument to the JIT-compi
 ### x86_64 Instruction Mapping
 
 | Brainfuck | Optimization | x86_64 Assembly | Machine Code Bytes |
-| --- | --- | --- | --- |
+| :--- | :--- | :--- | :--- |
 | `+` | Single | `inc byte ptr [rcx]` | `0xFE, 0x01` |
-| `+` $\times N$ | Folded | `add byte ptr [rcx], N` | `0x80, 0x01, N` |
+| `+` x N | Folded | `add byte ptr [rcx], N` | `0x80, 0x01, N` |
 | `-` | Single | `dec byte ptr [rcx]` | `0xFE, 0x09` |
-| `-` $\times N$ | Folded | `sub byte ptr [rcx], N` | `0x80, 0x29, N` |
-| `>` $\times N$ | Folded | `add rcx, N` | `0x48, 0x83, 0xC1, N` |
-| `<` $\times N$ | Folded | `sub rcx, N` | `0x48, 0x83, 0xE9, N` |
+| `-` x N | Folded | `sub byte ptr [rcx], N` | `0x80, 0x29, N` |
+| `>` x N | Folded | `add rcx, N` | `0x48, 0x83, 0xC1, N` |
+| `<` x N | Folded | `sub rcx, N` | `0x48, 0x83, 0xE9, N` |
 | `[-]` | Idiom Match | `mov byte ptr [rcx], 0` | `0xC6, 0x01, 0x00` |
-| `[` | Loop Entry | `cmp byte ptr [rcx], 0`<br>
-
-<br>`je <offset>` | `0x80, 0x39, 0x00`<br>
-
-<br>`0x74, <offset>` |
-| `]` | Loop Exit | `jmp <offset>` | `0x5E, <offset>` |
+| `[` | Loop Entry | `cmp byte ptr [rcx], 0` <br> `je <offset>` | `0x80, 0x39, 0x00` <br> `0x74, <offset>` |
+| `]` | Loop Exit | `jmp <offset>` | `0xEB, <offset>` |
 | `.` | Input/Output | Native C ABI Call | Preserves `RCX`, sets shadow space, calls `print_char` |
+| `,` | Input/Output | Native C ABI Call | Preserves `RCX`, sets shadow space, calls `read_char` |
 
 ## Code Structure
 
@@ -82,9 +79,3 @@ cargo build --release
 
 ```
 
-To run unit validation suites checking loop offset mathematics and boundary overflows:
-
-```bash
-cargo test
-
-```
