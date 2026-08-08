@@ -1,3 +1,4 @@
+use std::io::{self, Read, Write};
 use std::mem;
 use std::os::raw::c_void;
 use windows_sys::Win32::System::Memory::{
@@ -9,8 +10,6 @@ const CODE_PAGES: usize = 4;
 const TAPE_PAGES: usize = 8;
 const CODE_BUFFER_SIZE: usize = CODE_PAGES * PAGE_SIZE;
 const TAPE_BUFFER_SIZE: usize = TAPE_PAGES * PAGE_SIZE;
-
-use std::io::{self, Write};
 
 struct BrainFork {
     code_buffer: *mut u8,
@@ -140,6 +139,30 @@ impl BrainFork {
                     // pop rcx
                     compiled.push(0x59);
                 }
+                ',' => {
+                    // push rcx
+                    compiled.push(0x51);
+
+                    // sub rsp, 32
+                    compiled.extend_from_slice(&[0x48, 0x83, 0xEC, 0x20]);
+
+                    // mov rax, <read_char address>
+                    compiled.extend_from_slice(&[0x48, 0xB8]);
+                    let fn_addr = read_char as usize as u64;
+                    compiled.extend_from_slice(&fn_addr.to_le_bytes());
+
+                    // call rax
+                    compiled.extend_from_slice(&[0xFF, 0xD0]);
+
+                    // add rsp, 32
+                    compiled.extend_from_slice(&[0x48, 0x83, 0xC4, 0x20]);
+
+                    // pop rcx
+                    compiled.push(0x59);
+
+                    // mov byte ptr [rcx], al
+                    compiled.extend_from_slice(&[0x88, 0x01]);
+                }
                 // Ignore non-Brainfork characters
                 _ => {}
             }
@@ -191,6 +214,15 @@ impl BrainFork {
 extern "win64" fn print_char(byte: u8) {
     print!("{}", byte as char);
     let _ = io::stdout().flush();
+}
+
+extern "win64" fn read_char() -> u8 {
+    let mut buffer = [0u8; 1];
+    if io::stdin().read_exact(&mut buffer).is_ok() {
+        buffer[0]
+    } else {
+        0
+    }
 }
 
 fn main() {
