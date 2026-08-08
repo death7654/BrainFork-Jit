@@ -23,7 +23,7 @@ impl JitMemory {
             }
 
             // let ret: [u8; 4] = [0xC3, 0x00, 0x00, 0x00]; standard ret
-            let ret: [u8; 6] = [0xB8, 0x2A, 0x00, 0x00, 0x00, 0xC3];
+            let ret: [u8; 9] = [0xB8, 0x2A, 0x00, 0x00, 0x00, 0xC3, 0x00, 0x00, 0x00];
             std::ptr::copy_nonoverlapping(ret.as_ptr(), dest, ret.len());
 
             let mut old_protect = 0u32;
