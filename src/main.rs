@@ -148,7 +148,7 @@ impl BrainFork {
 
                     // mov rax, <read_char address>
                     compiled.extend_from_slice(&[0x48, 0xB8]);
-                    let fn_addr = read_char as usize as u64;
+                    let fn_addr = read_char as *const () as usize as u64;
                     compiled.extend_from_slice(&fn_addr.to_le_bytes());
 
                     // call rax
